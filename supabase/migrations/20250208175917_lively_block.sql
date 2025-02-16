@@ -1,0 +1,122 @@
+-- /*
+--   # Add sample furniture data
+
+--   1. Sample Data
+--     - Add sample categories
+--     - Add sample products for each category
+--     - Categories include: Living Room, Bedroom, Dining Room, Office
+--     - Each product has realistic furniture data
+-- */
+
+-- -- Insert sample categories
+-- INSERT INTO categories (name, slug) VALUES
+--   ('Living Room', 'living-room'),
+--   ('Bedroom', 'bedroom'),
+--   ('Dining Room', 'dining-room'),
+--   ('Office', 'office');
+
+-- -- Insert sample products
+-- INSERT INTO products (name, slug, description, price, stock, category_id, image_url, is_featured, is_on_sale, sale_price) VALUES
+--   -- Living Room
+--   (
+--     'Modern Leather Sofa',
+--     'modern-leather-sofa',
+--     'Elegant 3-seater leather sofa with chrome legs and premium upholstery. Perfect for contemporary living spaces.',
+--     1299.99,
+--     10,
+--     (SELECT id FROM categories WHERE slug = 'living-room'),
+--     'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?q=80&w=1600&auto=format&fit=crop',
+--     true,
+--     false,
+--     null
+--   ),
+--   (
+--     'Minimalist Coffee Table',
+--     'minimalist-coffee-table',
+--     'Scandinavian-inspired coffee table with solid oak top and metal frame. Features clean lines and practical storage shelf.',
+--     399.99,
+--     15,
+--     (SELECT id FROM categories WHERE slug = 'living-room'),
+--     'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc?q=80&w=1600&auto=format&fit=crop',
+--     true,
+--     true,
+--     349.99
+--   ),
+
+--   -- Bedroom
+--   (
+--     'Queen Platform Bed',
+--     'queen-platform-bed',
+--     'Modern platform bed with integrated headboard and LED lighting. Includes under-bed storage.',
+--     899.99,
+--     8,
+--     (SELECT id FROM categories WHERE slug = 'bedroom'),
+--     'https://images.unsplash.com/photo-1505693314120-0d443867891c?q=80&w=1600&auto=format&fit=crop',
+--     true,
+--     false,
+--     null
+--   ),
+--   (
+--     'Luxury Wardrobe',
+--     'luxury-wardrobe',
+--     'Spacious wardrobe with mirror doors, LED lighting, and multiple compartments for organized storage.',
+--     1499.99,
+--     5,
+--     (SELECT id FROM categories WHERE slug = 'bedroom'),
+--     'https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?q=80&w=1600&auto=format&fit=crop',
+--     false,
+--     true,
+--     1299.99
+--   ),
+
+--   -- Dining Room
+--   (
+--     'Extendable Dining Table',
+--     'extendable-dining-table',
+--     'Elegant dining table that extends to seat up to 8 people. Made from solid oak with a natural finish.',
+--     799.99,
+--     12,
+--     (SELECT id FROM categories WHERE slug = 'dining-room'),
+--     'https://images.unsplash.com/photo-1617806118233-18e1de247200?q=80&w=1600&auto=format&fit=crop',
+--     true,
+--     false,
+--     null
+--   ),
+--   (
+--     'Velvet Dining Chairs Set',
+--     'velvet-dining-chairs-set',
+--     'Set of 4 luxurious velvet dining chairs with gold-finished steel legs. Available in multiple colors.',
+--     599.99,
+--     20,
+--     (SELECT id FROM categories WHERE slug = 'dining-room'),
+--     'https://images.unsplash.com/photo-1595428774223-ef52624120d2?q=80&w=1600&auto=format&fit=crop',
+--     false,
+--     true,
+--     499.99
+--   ),
+
+--   -- Office
+--   (
+--     'Executive Desk',
+--     'executive-desk',
+--     'Large executive desk with built-in wireless charging and cable management. Features drawers and shelving.',
+--     899.99,
+--     7,
+--     (SELECT id FROM categories WHERE slug = 'office'),
+--     'https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?q=80&w=1600&auto=format&fit=crop',
+--     true,
+--     false,
+--     null
+--   ),
+--   (
+--     'Ergonomic Office Chair',
+--     'ergonomic-office-chair',
+--     'Premium ergonomic office chair with adjustable lumbar support, headrest, and armrests. Perfect for long work hours.',
+--     499.99,
+--     15,
+--     (SELECT id FROM categories WHERE slug = 'office'),
+--     'https://images.unsplash.com/photo-1589384267710-7a25bc5ab784?q=80&w=1600&auto=format&fit=crop',
+--     true,
+--     true,
+--     429.99
+--   );
