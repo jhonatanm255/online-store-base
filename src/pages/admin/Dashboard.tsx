@@ -1,8 +1,11 @@
+import Sidebar from "./Sidebar";
+// import ProductForm from "./ProductForm";
+
 export default function AdminDashboard() {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-      <h1 className="text-3xl font-bold mb-8">Admin Dashboard</h1>
-      <p className="text-gray-600">Admin dashboard functionality coming soon...</p>
+    <div className="flex bg-gray-100">
+      <Sidebar />
+      <h1 className="flex h-screen justify-center items-start mx-auto mt-16 text-3xl font-semibold text-gray-700">Bienvenido al panel de administración</h1>
     </div>
   );
 }

@@ -1,25 +1,30 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import { Database } from '../types/supabase';
-import { Link } from 'react-router-dom';
-import { Search, Tag } from 'lucide-react';
-import debounce from 'lodash/debounce';
+import { useState, useEffect, useCallback } from "react";
+import { useParams, Link } from "react-router-dom";
+import { db } from "../lib/firebase";
+import { collection, getDocs } from "firebase/firestore";
+import { supabase } from "../lib/supabase";
+import { Search } from "lucide-react";
+import debounce from "lodash/debounce";
 
-type Product = Database['public']['Tables']['products']['Row'];
-type Category = Database['public']['Tables']['categories']['Row'];
+// Define el tipo de Producto basado en la estructura de Firebase
+type Product = {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  imageUrl: string;
+  createdAt: Date;
+};
 
 export default function Shop() {
-  const [searchParams] = useSearchParams();
+  const { category } = useParams();
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  const categorySlug = searchParams.get('category');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // Debounced search function
+  // Función debounced para la búsqueda
   const debouncedSearch = useCallback(
     debounce((query: string) => {
       setSearchQuery(query);
@@ -27,83 +32,58 @@ export default function Shop() {
     []
   );
 
-  // Handle search input change
+  // Manejar cambios en el input de búsqueda
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchTerm(value);
     debouncedSearch(value);
   };
 
-  useEffect(() => {
-    async function fetchCategories() {
-      try {
-        const { data: categoriesData } = await supabase
-          .from('categories')
-          .select('*')
-          .order('name');
-        
-        if (categoriesData) {
-          setCategories(categoriesData);
-        }
-      } catch (error) {
-        console.error('Error fetching categories:', error);
-      }
-    }
+  // Obtener la URL de la imagen desde Supabase
+  const getImageUrl = (imagePath: string) => {
+    const { data } = supabase.storage.from("products").getPublicUrl(imagePath);
+    return data.publicUrl;
+  };
 
-    fetchCategories();
-  }, []);
-
+  // Obtener productos desde Firebase
   useEffect(() => {
     async function fetchProducts() {
       setLoading(true);
-      
       try {
-        // If we have a category slug, first get the category ID
-        let categoryId: string | null = null;
-        if (categorySlug) {
-          const { data: categoryData } = await supabase
-            .from('categories')
-            .select('id')
-            .eq('slug', categorySlug)
-            .single();
-          
-          if (categoryData) {
-            categoryId = categoryData.id;
-          }
-        }
+        const querySnapshot = await getDocs(collection(db, "products"));
+        const productsData: Product[] = [];
+        querySnapshot.forEach((doc) => {
+          productsData.push({ id: doc.id, ...doc.data() } as Product);
+        });
 
-        // Fetch products with category filter if applicable
-        let query = supabase
-          .from('products')
-          .select('*');
-        
-        if (categoryId) {
-          query = query.eq('category_id', categoryId);
+        let filteredProducts = productsData;
+        if (category) {
+          filteredProducts = productsData.filter(
+            (product) =>
+              product.category.toLowerCase() === category.toLowerCase()
+          );
         }
 
         if (searchQuery) {
-          query = query.ilike('name', `%${searchQuery}%`);
+          filteredProducts = filteredProducts.filter((product) =>
+            product.name.toLowerCase().includes(searchQuery.toLowerCase())
+          );
         }
 
-        const { data: productsData } = await query.order('name');
-        
-        if (productsData) {
-          setProducts(productsData);
-        }
+        setProducts(filteredProducts);
       } catch (error) {
-        console.error('Error fetching products:', error);
+        console.error("Error fetching products:", error);
       } finally {
         setLoading(false);
       }
     }
 
     fetchProducts();
-  }, [categorySlug, searchQuery]);
+  }, [category, searchQuery]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
       <div className="flex flex-col md:flex-row gap-8">
-        {/* Sidebar */}
         <div className="w-full md:w-64">
           <div className="sticky top-4">
             <h2 className="text-lg font-semibold mb-4">Categories</h2>
@@ -111,33 +91,29 @@ export default function Shop() {
               <Link
                 to="/shop"
                 className={`block px-4 py-2 rounded-md ${
-                  !categorySlug
-                    ? 'bg-indigo-600 text-white'
-                    : 'hover:bg-gray-100'
+                  !category ? "bg-indigo-600 text-white" : "hover:bg-gray-100"
                 }`}
               >
                 All Products
               </Link>
-              {categories.map((category) => (
+              {["Living-Room", "Bedroom", "Dining", "Office"].map((cat) => (
                 <Link
-                  key={category.id}
-                  to={`/shop?category=${category.slug}`}
+                  key={cat}
+                  to={`/shop/${cat}`}
                   className={`block px-4 py-2 rounded-md ${
-                    categorySlug === category.slug
-                      ? 'bg-indigo-600 text-white'
-                      : 'hover:bg-gray-100'
+                    category === cat
+                      ? "bg-indigo-600 text-white"
+                      : "hover:bg-gray-100"
                   }`}
                 >
-                  {category.name}
+                  {cat.replace("-", " ")}
                 </Link>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Main Content */}
         <div className="flex-1">
-          {/* Search */}
           <div className="mb-8">
             <div className="relative">
               <input
@@ -145,13 +121,12 @@ export default function Shop() {
                 placeholder="Search products..."
                 value={searchTerm}
                 onChange={handleSearchChange}
-                className="bg-gray-50 w-full pl-10 pr-4 py-2  border border-gray-300 rounded-md focus:outline-none"
+                className="bg-gray-50 w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none"
               />
               <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
             </div>
           </div>
 
-          {/* Products Grid */}
           <div className="min-h-[400px]">
             {loading ? (
               <div className="flex items-center justify-center h-[400px]">
@@ -166,22 +141,16 @@ export default function Shop() {
                 {products.map((product) => (
                   <Link
                     key={product.id}
-                    to={`/product/${product.slug}`}
+                    to={`/product/${product.id}`} // Redirige a ProductDetails
                     className="group"
                   >
                     <div className="bg-white rounded-lg shadow-md overflow-hidden">
                       <div className="relative h-64">
                         <img
-                          src={product.image_url}
+                          src={getImageUrl(product.imageUrl)}
                           alt={product.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                         />
-                        {product.is_on_sale && (
-                          <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-sm font-medium flex items-center">
-                            <Tag className="h-4 w-4 mr-1" />
-                            Sale
-                          </div>
-                        )}
                       </div>
                       <div className="p-4">
                         <h3 className="text-lg font-semibold mb-2">
@@ -191,24 +160,8 @@ export default function Shop() {
                           {product.description}
                         </p>
                         <div className="flex items-center justify-between">
-                          <div>
-                            {product.is_on_sale && product.sale_price ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-lg font-bold text-indigo-600">
-                                  ${product.sale_price}
-                                </span>
-                                <span className="text-sm text-gray-500 line-through">
-                                  ${product.price}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-lg font-bold text-indigo-600">
-                                ${product.price}
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-sm text-gray-500">
-                            {product.stock} in stock
+                          <span className="text-lg font-bold text-indigo-600">
+                            ${product.price}
                           </span>
                         </div>
                       </div>

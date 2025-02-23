@@ -35,13 +35,13 @@ export default function Login() {
                 <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
                   Sign up
                 </Link>
-                {' or '}
+                {/* {' or '}
                 <button
                   onClick={() => setIsAdminLogin(true)}
                   className="font-medium text-indigo-600 hover:text-indigo-500"
                 >
                   login as admin
-                </button>
+                </button> */}
               </>
             )}
           </p>

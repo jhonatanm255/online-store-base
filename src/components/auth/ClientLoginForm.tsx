@@ -1,14 +1,16 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { auth } from '../../lib/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { loginSchema, type LoginInput } from '../../lib/validation';
-import { Lock, Mail } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { auth } from "../../lib/firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { loginSchema, type LoginInput } from "../../lib/validation";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../../lib/firebase"; // Aquí se importa correctamente
+import { Lock, Mail } from "lucide-react";
+import toast from "react-hot-toast";
 
 export default function ClientLoginForm() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -17,20 +19,31 @@ export default function ClientLoginForm() {
     setLoading(true);
 
     try {
-      // Validate input
+      // Validar la entrada del usuario
       const input: LoginInput = { email, password };
       loginSchema.parse(input);
 
-      // Check if it's not the admin email
-      if (email === 'admin@store.com') {
-        throw new Error('Please use the admin login form');
-      }
+      // Intentar iniciar sesión
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const user = userCredential.user;
 
-      await signInWithEmailAndPassword(auth, email, password);
-      navigate('/');
-      toast.success('Welcome back!');
+      // Verificar el rol de administrador en Firestore
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists() && userSnap.data().role === "admin") {
+        toast.success("¡Bienvenido, Administrador!");
+        navigate("/admin"); // Redirigir al panel de administrador
+      } else {
+        toast.success("¡Bienvenido de nuevo!");
+        navigate("/"); // Redirigir a la página principal
+      }
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.message || "Error al iniciar sesión.");
     } finally {
       setLoading(false);
     }
@@ -77,7 +90,7 @@ export default function ClientLoginForm() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="pl-10 items-center block w-full py-2 rounded-md border border-gray-300 shadow-sm focus:outline-none"
+            className="pl-10 block w-full py-2 rounded-md border border-gray-300 shadow-sm focus:outline-none"
             placeholder="******"
             required
           />
@@ -89,8 +102,21 @@ export default function ClientLoginForm() {
         disabled={loading}
         className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400"
       >
-        {loading ? "Signing in..." : "Sign in"}
+        {loading ? "Iniciando sesión..." : "Iniciar sesión"}
       </button>
     </form>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
