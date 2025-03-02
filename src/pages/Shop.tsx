@@ -82,7 +82,7 @@ export default function Shop() {
   }, [category, searchQuery]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+    <div className="max-w-7xl mx-auto mt-[65px] px-4 sm:px-6 lg:px-8 py-16">
       <div className="flex flex-col md:flex-row gap-8">
         <div className="w-full md:w-64">
           <div className="sticky top-4">

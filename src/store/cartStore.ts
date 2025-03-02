@@ -1,10 +1,10 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { Database } from '../types/supabase';
-import { supabase } from '../lib/supabase';
-import toast from 'react-hot-toast';
-
-type Product = Database['public']['Tables']['products']['Row'];
+import create from "zustand";
+import { persist } from "zustand/middleware";
+import { db, auth } from "../lib/firebase"; // Importa auth de firebase
+import { doc, setDoc, getDoc, deleteDoc, updateDoc } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth"; // Asegúrate de importar onAuthStateChanged
+import toast from "react-hot-toast";
+import { Product } from "../types/supabase"; // Asegúrate de tener la interfaz de productos
 
 interface CartItem {
   product: Product;
@@ -20,154 +20,163 @@ interface CartStore {
   getTotal: () => number;
   getItemsCount: () => number;
   syncWithDatabase: () => Promise<void>;
+  resetCart: () => void; // Nuevo método para resetear el carrito
 }
 
 export const useCartStore = create<CartStore>()(
   persist(
     (set, get) => ({
       items: [],
-      
       addItem: async (product, quantity = 1) => {
+        const user = auth.currentUser;
+        if (!user) {
+          toast.error("Please log in to add items to your cart");
+          return;
+        }
+
+        const uid = user.uid;
+        const cartRef = doc(db, "carts", uid); // Referencia al documento del carrito
+
         try {
-          const user = (await supabase.auth.getUser()).data.user;
-          if (!user) {
-            // If no user is logged in, just update local state
-            set((state) => {
-              const existingItem = state.items.find(
-                (item) => item.product.id === product.id
-              );
-
-              if (existingItem) {
-                return {
-                  items: state.items.map((item) =>
-                    item.product.id === product.id
-                      ? { ...item, quantity: item.quantity + quantity }
-                      : item
-                  ),
-                };
-              }
-
-              return {
-                items: [...state.items, { product, quantity }],
-              };
+          // Verificar si el carrito ya existe
+          const cartSnapshot = await getDoc(cartRef);
+          if (!cartSnapshot.exists()) {
+            // Si no existe, crear el carrito con el primer producto
+            await setDoc(cartRef, {
+              items: [{ product, quantity }],
             });
-            return;
+          } else {
+            // Si existe, actualizar el carrito
+            const existingItems = cartSnapshot.data()?.items || [];
+            const existingItemIndex = existingItems.findIndex(
+              (item: CartItem) => item.product.id === product.id
+            );
+
+            let updatedItems;
+            if (existingItemIndex !== -1) {
+              // Si el producto ya está en el carrito, actualizar la cantidad
+              updatedItems = existingItems.map(
+                (item: CartItem, index: number) =>
+                  index === existingItemIndex
+                    ? { ...item, quantity: item.quantity + quantity }
+                    : item
+              );
+            } else {
+              // Si el producto no está en el carrito, agregarlo
+              updatedItems = [...existingItems, { product, quantity }];
+            }
+
+            // Actualizar Firestore
+            await updateDoc(cartRef, {
+              items: updatedItems,
+            });
           }
 
-          // Update database
-          const { error } = await supabase
-            .from('cart_items')
-            .upsert({
-              user_id: user.id,
-              product_id: product.id,
-              quantity: quantity,
-            }, {
-              onConflict: 'user_id,product_id',
-              ignoreDuplicates: false
-            });
+          // Actualizar el estado local
+          set((state) => {
+            const existingItemIndex = state.items.findIndex(
+              (item) => item.product.id === product.id
+            );
+            if (existingItemIndex !== -1) {
+              const updatedItems = [...state.items];
+              updatedItems[existingItemIndex].quantity += quantity;
+              return { items: updatedItems };
+            } else {
+              return { items: [...state.items, { product, quantity }] };
+            }
+          });
 
-          if (error) throw error;
-
-          // Update local state
-          await get().syncWithDatabase();
-        } catch (error: any) {
-          toast.error('Failed to add item to cart');
-          console.error('Error adding item to cart:', error);
+          toast.success("Item added to cart!");
+        } catch (error) {
+          toast.error("Failed to add item to cart");
+          console.error(error);
         }
       },
 
       removeItem: async (productId) => {
+        const user = auth.currentUser;
+        if (!user) {
+          toast.error("Please log in to remove items from your cart");
+          return;
+        }
+
+        const uid = user.uid;
+        const cartRef = doc(db, "carts", uid);
+
         try {
-          const user = (await supabase.auth.getUser()).data.user;
-          if (!user) {
-            // If no user is logged in, just update local state
-            set((state) => ({
-              items: state.items.filter((item) => item.product.id !== productId),
-            }));
-            return;
-          }
+          set((state) => ({
+            items: state.items.filter((item) => item.product.id !== productId),
+          }));
 
-          // Remove from database
-          const { error } = await supabase
-            .from('cart_items')
-            .delete()
-            .eq('user_id', user.id)
-            .eq('product_id', productId);
+          // Actualizar Firestore después de eliminar el producto
+          await updateDoc(cartRef, {
+            items: get().items,
+          });
 
-          if (error) throw error;
-
-          // Update local state
-          await get().syncWithDatabase();
-        } catch (error: any) {
-          toast.error('Failed to remove item from cart');
-          console.error('Error removing item from cart:', error);
+          toast.success("Item removed from cart!");
+        } catch (error) {
+          toast.error("Failed to remove item from cart");
+          console.error(error);
         }
       },
 
       updateQuantity: async (productId, quantity) => {
-        if (quantity < 1) return;
-        
+        const user = auth.currentUser;
+        if (!user) {
+          toast.error("Please log in to update item quantity");
+          return;
+        }
+
+        const uid = user.uid;
+        const cartRef = doc(db, "carts", uid);
+
         try {
-          const user = (await supabase.auth.getUser()).data.user;
-          if (!user) {
-            // If no user is logged in, just update local state
-            set((state) => ({
-              items: state.items.map((item) =>
-                item.product.id === productId
-                  ? { ...item, quantity }
-                  : item
-              ),
-            }));
-            return;
-          }
+          set((state) => ({
+            items: state.items.map((item) =>
+              item.product.id === productId ? { ...item, quantity } : item
+            ),
+          }));
 
-          // Update database
-          const { error } = await supabase
-            .from('cart_items')
-            .update({ quantity })
-            .eq('user_id', user.id)
-            .eq('product_id', productId);
+          // Actualizar Firestore con la nueva cantidad
+          await updateDoc(cartRef, {
+            items: get().items,
+          });
 
-          if (error) throw error;
-
-          // Update local state
-          await get().syncWithDatabase();
-        } catch (error: any) {
-          toast.error('Failed to update cart');
-          console.error('Error updating cart:', error);
+          toast.success("Quantity updated!");
+        } catch (error) {
+          toast.error("Failed to update cart quantity");
+          console.error(error);
         }
       },
 
       clearCart: async () => {
+        const user = auth.currentUser;
+        if (!user) {
+          toast.error("Please log in to clear your cart");
+          return;
+        }
+
+        const uid = user.uid;
+        const cartRef = doc(db, "carts", uid);
+
         try {
-          const user = (await supabase.auth.getUser()).data.user;
-          if (!user) {
-            // If no user is logged in, just update local state
-            set({ items: [] });
-            return;
-          }
-
-          // Clear database
-          const { error } = await supabase
-            .from('cart_items')
-            .delete()
-            .eq('user_id', user.id);
-
-          if (error) throw error;
-
-          // Update local state
           set({ items: [] });
-        } catch (error: any) {
-          toast.error('Failed to clear cart');
-          console.error('Error clearing cart:', error);
+
+          // Eliminar el documento del carrito en Firestore
+          await deleteDoc(cartRef);
+          toast.success("Cart cleared!");
+        } catch (error) {
+          toast.error("Failed to clear cart");
+          console.error(error);
         }
       },
 
       getTotal: () => {
         return get().items.reduce((total, item) => {
-          const price = item.product.is_on_sale && item.product.sale_price
-            ? item.product.sale_price
-            : item.product.price;
+          const price =
+            item.product.is_on_sale && item.product.sale_price
+              ? item.product.sale_price
+              : item.product.price;
           return total + price * item.quantity;
         }, 0);
       },
@@ -177,42 +186,42 @@ export const useCartStore = create<CartStore>()(
       },
 
       syncWithDatabase: async () => {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const uid = user.uid;
+        const cartRef = doc(db, "carts", uid);
+
         try {
-          const user = (await supabase.auth.getUser()).data.user;
-          if (!user) return;
-
-          // Get cart items from database
-          const { data: cartItems, error } = await supabase
-            .from('cart_items')
-            .select(`
-              quantity,
-              products (*)
-            `)
-            .eq('user_id', user.id);
-
-          if (error) throw error;
-
-          // Update local state
-          set({
-            items: cartItems.map((item: any) => ({
-              product: item.products,
-              quantity: item.quantity,
-            })),
-          });
-        } catch (error: any) {
-          console.error('Error syncing with database:', error);
+          const cartSnapshot = await getDoc(cartRef);
+          if (cartSnapshot.exists()) {
+            set({ items: cartSnapshot.data()?.items || [] });
+          } else {
+            // Si el carrito no existe, crea uno vacío
+            await setDoc(cartRef, { items: [] });
+            set({ items: [] });
+          }
+        } catch (error) {
+          console.error("Error syncing with Firestore:", error);
         }
+      },
+
+      resetCart: () => {
+        set({ items: [] });
       },
     }),
     {
-      name: 'cart-storage',
+      name: "cart-storage", // Nombre para la persistencia local
     }
   )
 );
 
-// Listen for auth state changes to sync cart
-supabase.auth.onAuthStateChange(async (event) => {
-  if (event === 'SIGNED_IN') {
+// Escuchar cambios en la autenticación para sincronizar el carrito
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
     await useCartStore.getState().syncWithDatabase();
+  } else {
+    // Limpiar el carrito si el usuario cierra sesión
+    useCartStore.getState().resetCart();
   }
 });

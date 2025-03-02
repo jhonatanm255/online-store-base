@@ -41,22 +41,34 @@ export default function Footer() {
             <h3 className="text-lg font-semibold mb-4">Categories</h3>
             <ul className="space-y-2">
               <li>
-                <Link to="/shop?category=living-room" className="text-gray-400 hover:text-white">
+                <Link
+                  to="/shop?category=living-room"
+                  className="text-gray-400 hover:text-white"
+                >
                   Living Room
                 </Link>
               </li>
               <li>
-                <Link to="/shop?category=bedroom" className="text-gray-400 hover:text-white">
+                <Link
+                  to="/shop?category=bedroom"
+                  className="text-gray-400 hover:text-white"
+                >
                   Bedroom
                 </Link>
               </li>
               <li>
-                <Link to="/shop?category=dining" className="text-gray-400 hover:text-white">
+                <Link
+                  to="/shop?category=dining"
+                  className="text-gray-400 hover:text-white"
+                >
                   Dining
                 </Link>
               </li>
               <li>
-                <Link to="/shop?category=office" className="text-gray-400 hover:text-white">
+                <Link
+                  to="/shop?category=office"
+                  className="text-gray-400 hover:text-white"
+                >
                   Office
                 </Link>
               </li>
@@ -81,10 +93,10 @@ export default function Footer() {
             </ul>
           </div>
         </div>
-
         <div className="mt-8 pt-8 border-t border-gray-800">
           <p className="text-center text-gray-400 text-sm">
-            &copy; {new Date().getFullYear()} LuxeFurniture. All rights reserved.
+            &copy; {new Date().getFullYear()} LuxeFurniture. All rights
+            reserved.
           </p>
         </div>
       </div>

@@ -22,6 +22,7 @@ import Contact from "./pages/Contact";
 import Success from "./pages/Success"; // Importar la página de éxito
 import PrivateRoute from "./components/PrivateRoute";
 import AdminRoute from "./components/AdminRoute";
+import Cancel from "./pages/Cancel"; // Importar la página de cancelación
 
 function Layout() {
   const location = useLocation();
@@ -52,6 +53,7 @@ function Layout() {
 
           {/* ✅ Agregar la ruta para la página de éxito */}
           <Route path="/success" element={<Success />} />
+          <Route path="/cancel" element={<Cancel />} />
         </Routes>
       </main>
       {!isAdminRoute && <Footer />} {/* Ocultar footer en admin */}

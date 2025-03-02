@@ -7,7 +7,7 @@ import {
   FaCog,
   FaBars,
   FaHome,
-} from "react-icons/fa"; // Ejemplo de iconos
+} from "react-icons/fa";
 
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);

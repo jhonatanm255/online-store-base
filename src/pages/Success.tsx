@@ -1,79 +1,112 @@
-import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { useCartStore } from "../store/cartStore"; // Ajusta la ruta según tu estructura
-import { Link } from "react-router-dom"; // Importar Link desde react-router-dom
+import React, { useEffect, useState } from "react";
+import { useLocation, Link } from "react-router-dom";
 import toast from "react-hot-toast";
+import { Check } from "lucide-react";
+
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+}
+
+interface OrderDetails {
+  success: boolean;
+  products?: Product[];
+}
 
 const Success = () => {
   const location = useLocation();
-  const clearCart = useCartStore((state) => state.clearCart);
-  const [orderDetails, setOrderDetails] = useState(null);
+  const sessionId = new URLSearchParams(location.search).get("session_id");
   const [loading, setLoading] = useState(true);
+  const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
 
   useEffect(() => {
-    // Obtener el session_id de la URL
-    const queryParams = new URLSearchParams(location.search);
-    const sessionId = queryParams.get("session_id");
-
-    if (!sessionId) {
-      toast.error("No se pudo obtener el ID de la sesión.");
-      setLoading(false);
-      return;
-    }
-
-    // Verificar el estado del pago con el backend
     const verifyPayment = async () => {
       try {
         const response = await fetch(
-          `http://localhost:5173/api/verify-payment?session_id=${sessionId}`
+          `https://forniture-backend.vercel.app/api/verify-payment?session_id=${sessionId}`,
+          // `http://localhost:5000/api/verify-payment?session_id=${sessionId}`
         );
 
         if (!response.ok) throw new Error("No se pudo verificar el pago.");
 
         const data = await response.json();
-        setOrderDetails(data); // Guardar los detalles del pedido
-        clearCart(); // Limpiar el carrito
+        setOrderDetails(data);
         toast.success("¡Pago completado con éxito! Gracias por tu compra.");
       } catch (error) {
-        toast.error("Hubo un problema al verificar el pago.");
+        toast.error(
+          `Hubo un problema al verificar el pago: ${
+            error instanceof Error ? error.message : "Error desconocido"
+          }`
+        );
         console.error(error);
       } finally {
         setLoading(false);
       }
     };
 
-    verifyPayment();
-  }, [location.search, clearCart]);
+    if (sessionId) {
+      verifyPayment();
+    } else {
+      toast.error("No se pudo obtener el ID de la sesión.");
+      setLoading(false);
+    }
+  }, [sessionId]);
 
   if (loading) {
-    return <div>Cargando...</div>;
+    return (
+      <div className="flex items-center justify-center h-screen">
+        Cargando...
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
-      <div className="bg-white p-8 rounded-lg shadow-md text-center">
-        <h1 className="text-2xl font-bold text-green-600 mb-4">
-          ¡Pago completado con éxito!
-        </h1>
+    <div className="min-h-screen flex flex-col items-center justify-center lg:mt-[64px] p-4">
+      <Check className="text-2xl text-green-600 w-36 h-36 p-8 bg-green-100 rounded-full flex justify-center mx-auto my-8" />
+      <h1 className="text-2xl text-center font-bold mb-4 text-green-600">
+        ¡Pago completado con éxito!
+      </h1>
+      <p className="text-md text-center mb-2 text-gray-700">
+        Gracias por tu compra. Aquí están los detalles de tu pedido:
+      </p>
+      <div className="bg-green-100 p-6 rounded-lg shadow-md w-full max-w-3xl">
+        <h2 className="text-md font-semibold mb-2">Detalles del Pedido</h2>
+        <p className="flex mb-1 text-gray-800 overflow-hidden">
+          <strong className="mr-1">ID de Sesión: </strong>
+          <span className="truncate">{sessionId}</span>
+        </p>
         {orderDetails ? (
-          <div>
-            <p className="text-gray-700 mb-6">
-              Gracias por tu compra. Aquí están los detalles de tu pedido:
+          <>
+            <p className="mb-1 text-gray-800">
+              <strong>Estado:</strong>{" "}
+              {orderDetails.success ? "Pagado" : "No pagado"}
             </p>
-            <pre>{JSON.stringify(orderDetails, null, 2)}</pre>
-          </div>
+            {orderDetails.products && orderDetails.products.length > 0 ? (
+              <div>
+                <strong>Productos:</strong>
+                <ul className="list-disc pl-5">
+                  {orderDetails.products.map((product) => (
+                    <li key={product.id}>
+                      {product.name} - {product.price} MXN
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p>No hay productos en este pedido.</p>
+            )}
+          </>
         ) : (
-          <p className="text-gray-700 mb-6">
-            No se pudieron cargar los detalles del pedido.
-          </p>
+          <p className="mb-1">No se pudieron cargar los detalles del pedido.</p>
         )}
-        <Link
-          to="/shop"
-          className="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Seguir comprando
-        </Link>
       </div>
+      <Link
+        to="/shop"
+        className="mt-4 mb-12 p-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+      >
+        Seguir comprando
+      </Link>
     </div>
   );
 };

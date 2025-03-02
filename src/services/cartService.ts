@@ -1,73 +1,82 @@
+import { db } from "../lib/firebase";
+import { collection, doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
 import { supabase } from "../lib/supabase";
 
-// Agregar un producto al carrito
-export const addToCart = async (
-  productId: string,
-  quantity: number,
-  userId: string
-) => {
-  const { data, error } = await supabase
-    .from("cart")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("product_id", productId)
-    .single();
+// Definir tipos para TypeScript
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  imageUrl?: string;
+  quantity: number;
+}
 
-  if (error && error.code !== "PGRST116") {
-    console.error("Error checking cart:", error);
-    return;
-  }
+// Agregar un producto al carrito en Firestore
+export const addToCart = async (userId: string, product: Product) => {
+  try {
+    const cartRef = doc(db, "carts", userId);
+    const cartSnap = await getDoc(cartRef);
+    let cartItems: Product[] = [];
 
-  if (data) {
-    // Si el producto ya está en el carrito, actualizar la cantidad
-    const newQuantity = data.quantity + quantity;
-    await updateCart(productId, newQuantity, userId);
-  } else {
-    // Si no existe, insertarlo
-    const { error } = await supabase.from("cart").insert([
-      {
-        user_id: userId,
-        product_id: productId,
-        quantity,
-      },
-    ]);
+    if (cartSnap.exists()) {
+      cartItems = cartSnap.data().items || [];
+    }
+
+    // Buscar la imagen en Supabase
+    const { data, error } = await supabase
+      .from("products")
+      .select("image_url")
+      .eq("id", product.id)
+      .single();
 
     if (error) {
-      console.error("Error adding to cart:", error);
+      console.error("Error fetching image from Supabase: ", error);
     }
+
+    const imageUrl = data ? data.image_url : "";
+
+    cartItems.push({ ...product, imageUrl });
+    await setDoc(cartRef, { items: cartItems }, { merge: true });
+  } catch (error) {
+    console.error("Error adding to cart: ", error);
   }
 };
 
-// Actualizar la cantidad de un producto en el carrito
-export const updateCart = async (
-  productId: string,
-  quantity: number,
-  userId: string
-) => {
-  if (quantity <= 0) {
-    return removeFromCart(productId, userId);
-  }
+// Obtener productos del carrito
+export const getCartItems = async (userId: string): Promise<Product[]> => {
+  try {
+    const cartRef = doc(db, "carts", userId);
+    const cartSnap = await getDoc(cartRef);
 
-  const { error } = await supabase
-    .from("cart")
-    .update({ quantity })
-    .eq("user_id", userId)
-    .eq("product_id", productId);
-
-  if (error) {
-    console.error("Error updating cart:", error);
+    return cartSnap.exists() ? (cartSnap.data().items as Product[]) || [] : [];
+  } catch (error) {
+    console.error("Error fetching cart items: ", error);
+    return [];
   }
 };
 
-// Eliminar un producto del carrito
-export const removeFromCart = async (productId: string, userId: string) => {
-  const { error } = await supabase
-    .from("cart")
-    .delete()
-    .eq("user_id", userId)
-    .eq("product_id", productId);
+// Eliminar producto del carrito
+export const removeFromCart = async (userId: string, productId: string) => {
+  try {
+    const cartRef = doc(db, "carts", userId);
+    const cartSnap = await getDoc(cartRef);
 
-  if (error) {
-    console.error("Error removing from cart:", error);
+    if (!cartSnap.exists()) return;
+
+    const cartItems = (cartSnap.data().items as Product[]).filter(
+      (item) => item.id !== productId
+    );
+    await setDoc(cartRef, { items: cartItems }, { merge: true });
+  } catch (error) {
+    console.error("Error removing from cart: ", error);
+  }
+};
+
+// Vaciar carrito después de la compra
+export const clearCart = async (userId: string) => {
+  try {
+    await deleteDoc(doc(db, "carts", userId));
+  } catch (error) {
+    console.error("Error clearing cart: ", error);
   }
 };
