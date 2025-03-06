@@ -119,10 +119,10 @@ app.post("/create-checkout-session", async (req, res) => {
         quantity: item.quantity,
       })),
       mode: "payment",
-      // success_url: `http://localhost:5173/success?session_id={CHECKOUT_SESSION_ID}`,
-      // cancel_url: `http://localhost:5173/cancel`,
-      success_url: `https://forniture-store.vercel.app/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `https://forniture-store.vercel.app/cancel`,
+      success_url: `http://localhost:5173/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `http://localhost:5173/cancel`,
+      // success_url: `https://forniture-store.vercel.app/success?session_id={CHECKOUT_SESSION_ID}`,
+      // cancel_url: `https://forniture-store.vercel.app/cancel`,
       metadata: { userId }, // Guardar el userId en los metadatos de la sesión
     });
 

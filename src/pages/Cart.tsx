@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { supabase } from "../lib/supabase";
 import { loadStripe } from "@stripe/stripe-js";
+import toast from "react-hot-toast";
 
 export default function Cart() {
   const { items, removeItem, updateQuantity, getTotal } = useCartStore();
@@ -15,49 +16,51 @@ export default function Cart() {
     return data.publicUrl;
   };
 
-  const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY); // Usa variable de entorno
+  const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
   const handleCheckout = async () => {
-  const cartItems = items.map((item) => ({
-    id: item.product.id,
-    name: item.product.name,
-    price: item.product.price,
-    quantity: item.quantity,
-    image: getImageUrl(item.product.image_url), // Usar image_url en lugar de imageUrl
-  }));
+    if (!user) {
+      toast.error("Please log in to proceed with checkout");
+      return;
+    }
 
-  console.log("Cart items:", cartItems); // Verificar que la imagen se genera correctamente
+    const cartItems = items.map((item) => ({
+      id: item.product.id,
+      name: item.product.name,
+      price: item.product.price,
+      quantity: item.quantity,
+      image: getImageUrl(item.product.image_url),
+    }));
 
-  try {
-    const response = await fetch(
-      "https://forniture-backend.vercel.app/create-checkout-session",
-      // "http://localhost:5000/create-checkout-session",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: cartItems }),
+    try {
+      const response = await fetch(
+        // "https://forniture-backend.vercel.app/create-checkout-session",
+        "http://localhost:5000/create-checkout-session",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: cartItems, userId: user.uid }), // Pasar el userId
+        }
+      );
+
+      if (!response.ok) throw new Error("No se pudo iniciar el pago");
+
+      const { id } = await response.json();
+      const stripe = await stripePromise;
+
+      if (!stripe) {
+        throw new Error("Stripe no se ha cargado correctamente");
       }
-    );
 
-    if (!response.ok) throw new Error("No se pudo iniciar el pago");
+      const { error } = await stripe.redirectToCheckout({ sessionId: id });
 
-    const { id } = await response.json();
-    const stripe = await stripePromise;
-
-    if (!stripe) {
-      throw new Error("Stripe no se ha cargado correctamente");
+      if (error) {
+        console.error("Error al procesar el pago:", error.message);
+      }
+    } catch (error) {
+      console.error("Error al procesar el pago:", error);
     }
-
-    const { error } = await stripe.redirectToCheckout({ sessionId: id });
-
-    if (error) {
-      console.error("Error al procesar el pago:", error.message);
-    }
-  } catch (error) {
-    console.error("Error al procesar el pago:", error);
-  }
-};
-
+  };
 
   if (items.length === 0) {
     return (

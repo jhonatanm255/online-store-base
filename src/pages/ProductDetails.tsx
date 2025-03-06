@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { db } from "../lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabase";
 import { ShoppingCart } from "lucide-react";
 import { useCartStore } from "../store/cartStore";
 import toast from "react-hot-toast";
+
 
 // Define el tipo de Producto
 type Product = {
@@ -28,9 +29,8 @@ export default function ProductDetails() {
   const { id } = useParams();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Acceder a la función para agregar al carrito desde Zustand
   const addItem = useCartStore((state) => state.addItem);
+  const navigate = useNavigate();
 
   // Obtener la URL de la imagen desde Supabase
   const getImageUrl = (imagePath: string) => {
@@ -66,7 +66,7 @@ export default function ProductDetails() {
   // Manejar la adición al carrito (cantidad predeterminada = 1)
   const handleAddToCart = async () => {
     if (product) {
-      await addItem(product, 1);
+      await addItem(product, 1, () => navigate("/login"));
       toast.success("Added to cart!");
     }
   };
