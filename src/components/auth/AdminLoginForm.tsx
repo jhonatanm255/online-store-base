@@ -1,13 +1,13 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
-import { loginSchema, type LoginInput } from '../../lib/validation';
-import { Lock, Mail } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../../lib/firebase";
+import toast from "react-hot-toast";
 
 export default function AdminLoginForm() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -16,24 +16,28 @@ export default function AdminLoginForm() {
     setLoading(true);
 
     try {
-      // Validate input
-      const input: LoginInput = { email, password };
-      loginSchema.parse(input);
+      // Cerrar cualquier sesión existente antes de iniciar
+      await signOut(auth);
 
-      // Check if it's the admin email
-      if (email !== 'admin@store.com') {
-        throw new Error('Invalid admin credentials');
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const user = userCredential.user;
+
+      // Verificar el rol en Firestore
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists() || userSnap.data().role !== "admin") {
+        await signOut(auth); // Cierra la sesión si no es admin
+        throw new Error("No tienes permisos de administrador");
       }
 
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      navigate('/admin');
-      toast.success('Welcome back, Admin!');
+      toast.success("Bienvenido Admin");
+      navigate("admin"); // Redirige al panel de administración
+      console.log('iniciaste sesion como admin')
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -50,20 +54,15 @@ export default function AdminLoginForm() {
         >
           Admin Email
         </label>
-        <div className="relative mt-1">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Mail className="h-5 w-5 text-gray-400" />
-          </div>
-          <input
-            id="admin-email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="pl-10 py-2 block w-full rounded-md border border-gray-300 shadow-sm focus:outline-none"
-            placeholder="admin@store.com"
-            required
-          />
-        </div>
+        <input
+          id="admin-email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="block w-full rounded-md border border-gray-300 p-2"
+          placeholder="admin@store.com"
+          required
+        />
       </div>
 
       <div>
@@ -73,28 +72,23 @@ export default function AdminLoginForm() {
         >
           Password
         </label>
-        <div className="relative mt-1">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Lock className="h-5 w-5 text-gray-400" />
-          </div>
-          <input
-            id="admin-password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="pl-10 py-2 block w-full rounded-md border border-gray-300 shadow-sm focus:outline-none"
-            placeholder="******"
-            required
-          />
-        </div>
+        <input
+          id="admin-password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="block w-full rounded-md border border-gray-300 p-2"
+          placeholder="******"
+          required
+        />
       </div>
 
       <button
         type="submit"
         disabled={loading}
-        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400"
+        className="w-full bg-indigo-600 text-white py-2 rounded-md disabled:bg-indigo-400"
       >
-        {loading ? "Signing in..." : "Sign in as Admin"}
+        {loading ? "Verificando..." : "Iniciar sesión"}
       </button>
     </form>
   );

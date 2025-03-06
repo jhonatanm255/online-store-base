@@ -1,44 +1,73 @@
-import { useParams } from 'react-router-dom';
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { Database } from '../types/supabase';
-import { ShoppingCart, Plus, Minus } from 'lucide-react';
-import { useCartStore } from '../store/cartStore';
-import toast from 'react-hot-toast';
+import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { db } from "../lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { supabase } from "../lib/supabase";
+import { ShoppingCart } from "lucide-react";
+import { useCartStore } from "../store/cartStore";
+import toast from "react-hot-toast";
 
-type Product = Database['public']['Tables']['products']['Row'];
+
+// Define el tipo de Producto
+type Product = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  price: number;
+  stock: number;
+  category_id: string | null;
+  imageUrl: string;
+  is_featured: boolean;
+  is_on_sale: boolean;
+  sale_price: number | null;
+  created_at: string;
+  updated_at: string;
+};
 
 export default function ProductDetails() {
-  const { slug } = useParams();
+  const { id } = useParams();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
-  const [quantity, setQuantity] = useState(1);
   const addItem = useCartStore((state) => state.addItem);
+  const navigate = useNavigate();
 
+  // Obtener la URL de la imagen desde Supabase
+  const getImageUrl = (imagePath: string) => {
+    const { data } = supabase.storage.from("products").getPublicUrl(imagePath);
+    return data.publicUrl;
+  };
+
+  // Obtener el producto desde Firebase
   useEffect(() => {
-    async function fetchProduct() {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('slug', slug)
-        .single();
+    const fetchProduct = async () => {
+      if (!id) return;
 
-      if (error) {
-        console.error('Error fetching product:', error);
-        return;
+      try {
+        const productRef = doc(db, "products", id);
+        const productSnapshot = await getDoc(productRef);
+
+        if (productSnapshot.exists()) {
+          const productData = productSnapshot.data() as Omit<Product, "id">;
+          setProduct({ id: productSnapshot.id, ...productData });
+        } else {
+          console.error("Product not found");
+        }
+      } catch (error) {
+        console.error("Error fetching product:", error);
+      } finally {
+        setLoading(false);
       }
-
-      setProduct(data);
-      setLoading(false);
-    }
+    };
 
     fetchProduct();
-  }, [slug]);
+  }, [id]);
 
-  const handleAddToCart = () => {
+  // Manejar la adición al carrito (cantidad predeterminada = 1)
+  const handleAddToCart = async () => {
     if (product) {
-      addItem(product, quantity);
-      toast.success('Added to cart!');
+      await addItem(product, 1, () => navigate("/login"));
+      toast.success("Added to cart!");
     }
   };
 
@@ -59,67 +88,47 @@ export default function ProductDetails() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+    <div className="max-w-7xl mx-auto mt-[64px] px-4 sm:px-6 lg:px-8 py-16">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+        {/* Imagen del producto */}
         <div>
           <img
-            src={product.image_url}
+            src={getImageUrl(product.imageUrl)}
             alt={product.name}
             className="w-full h-[500px] object-cover rounded-lg"
           />
         </div>
+
+        {/* Detalles del producto */}
         <div>
           <h1 className="text-3xl font-bold mb-4">{product.name}</h1>
           <p className="text-gray-600 mb-6">{product.description}</p>
+
+          {/* Precio */}
           <div className="mb-6">
-            {product.is_on_sale && product.sale_price ? (
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-bold text-indigo-600">
-                  ${product.sale_price}
-                </span>
-                <span className="text-lg text-gray-500 line-through">
-                  ${product.price}
-                </span>
-              </div>
-            ) : (
-              <span className="text-2xl font-bold text-indigo-600">
-                ${product.price}
-              </span>
-            )}
+            <span className="text-2xl font-bold text-indigo-600">
+              $
+              {product.is_on_sale && product.sale_price
+                ? product.sale_price
+                : product.price}
+            </span>
           </div>
+
+          {/* Stock disponible */}
           <div className="mb-6">
             <p className="text-sm text-gray-600">
               Stock available: {product.stock}
             </p>
           </div>
-          
-          <div className="flex items-center gap-4 mb-6">
-            <div className="flex items-center gap-2 border rounded-md">
-              <button
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="p-2 hover:bg-gray-100"
-                disabled={quantity <= 1}
-              >
-                <Minus className="h-4 w-4" />
-              </button>
-              <span className="w-12 text-center">{quantity}</span>
-              <button
-                onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                className="p-2 hover:bg-gray-100"
-                disabled={quantity >= product.stock}
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
 
+          {/* Botón para añadir al carrito */}
           <button
             onClick={handleAddToCart}
             disabled={product.stock === 0}
             className="w-full bg-indigo-600 text-white py-3 px-6 rounded-md hover:bg-indigo-700 flex items-center justify-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             <ShoppingCart className="h-5 w-5" />
-            {product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
+            {product.stock === 0 ? "Out of Stock" : "Add to Cart"}
           </button>
         </div>
       </div>
